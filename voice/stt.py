@@ -1,31 +1,9 @@
-# mrx_project/voice/stt.py
+# voice/stt.py (Версия с таймаутом)
+
 import vosk
 import sounddevice as sd
 import json
 import queue
-import os # <-- Импортируем модуль os
-
-# --- Умное определение пути к модели ---
-# Получаем путь к директории, где лежит ЭТОТ файл (voice/)
-_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# Поднимаемся на один уровень вверх, чтобы попасть в корень проекта (mrx_project/)
-_PROJECT_ROOT = os.path.dirname(_CURRENT_DIR)
-# Собираем полный, абсолютный путь к папке с моделью
-MODEL_PATH = os.path.join(_PROJECT_ROOT, "vosk-model-small-ru-0.22")
-
-# Частота дискретизации, важна для Vosk
-SAMPLE_RATE = 16000
-# ID вашего микрофона (None - по умолчанию)
-DEVICE_ID = None
-
-# Проверяем, существует ли модель
-try:
-    print(f"Загрузка модели Vosk из: {MODEL_PATH}") # Добавим отладочный вывод
-    model = vosk.Model(MODEL_PATH)
-except Exception:
-    print(f"ОШИБКА: Не удалось найти модель Vosk по пути '{MODEL_PATH}'.")
-    print("Убедитесь, что вы скачали, распаковали и положили ее в корень проекта.")
-    exit()
 
 q = queue.Queue()
 
@@ -37,22 +15,44 @@ def callback(indata, frames, time, status):
     q.put(bytes(indata))
 
 
-def listen():
+def listen(vosk_model_obj, listen_timeout=3.0):  # Добавляем таймаут прослушивания
     """
-    Слушает микрофон до тех пор, пока не будет распознана полная фраза.
-    Возвращает распознанный текст.
+    Слушает микрофон в течение `listen_timeout` секунд.
+    Если распознана полная фраза, возвращает ее.
+    Если таймаут истек, обрабатывает то, что было сказано, и возвращает результат.
     """
-    recognizer = vosk.KaldiRecognizer(model, SAMPLE_RATE)
-    print("\nСлушаю...")
+    if vosk_model_obj is None:
+        print("ОШИБКА: Vosk модель не загружена. Не могу слушать.")
+        return ""
 
-    with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=8000, device=DEVICE_ID,
+    recognizer = vosk.KaldiRecognizer(vosk_model_obj, 16000)
+    print(f"\nСлушаю на языке {vosk_model_obj.lang_name}...")
+
+    # Используем `with`, чтобы микрофон гарантированно выключился
+    with sd.RawInputStream(samplerate=16000, blocksize=8000, device=None,
                            dtype='int16', channels=1, callback=callback):
 
         while True:
-            data = q.get()
-            if recognizer.AcceptWaveform(data):
-                result = json.loads(recognizer.Result())
-                text = result.get('text', '')
-                if text:  # Если что-то распознано
-                    print(f"Распознано: '{text}'")
-                    return text
+            try:
+                # Пытаемся получить данные из очереди в течение listen_timeout секунд
+                data = q.get(timeout=listen_timeout)
+
+                if recognizer.AcceptWaveform(data):
+                    result = json.loads(recognizer.Result())
+                    text = result.get('text', '')
+                    if text:
+                        print(f"Распознано: '{text}'")
+                        return text
+            except queue.Empty:
+                # Если за `listen_timeout` секунд ничего не пришло, значит, тишина.
+                # Выходим из цикла и обрабатываем "остатки" речи.
+                # print("Таймаут прослушивания...")
+                break
+
+    # Обрабатываем то, что могло быть сказано в самом конце
+    final_result = json.loads(recognizer.FinalResult())
+    text = final_result.get('text', '')
+    if text:
+        print(f"Распознано (частично): '{text}'")
+
+    return text

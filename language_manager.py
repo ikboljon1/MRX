@@ -6,8 +6,7 @@ import sounddevice as sd
 import os
 
 # --- Умное определение пути к модели ---
-_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-_PROJECT_ROOT = os.path.dirname(_CURRENT_DIR) # Поднимаемся на один уровень вверх, чтобы попасть в корень проекта (mrx_project/)
+_PROJECT_ROOT = os.path.dirname(os.path.abspath(__file__))
 
 # --- Настройки ---
 # Модель для определения языка (lid.176.bin должна лежать в корне проекта)
@@ -22,15 +21,17 @@ LANG_CONFIG = {
     'ru': {
         'vosk_model_path': os.path.join(_PROJECT_ROOT, 'vosk-model-small-ru-0.22'),
         'silero_model_id': 'v3_1_ru', # Для русского используем ru модель Silero
-        'silero_speaker': 'baya',     # Или 'aidar', 'kseniya', 'natasha', 'xenia', 'eugene'
+        'silero_speaker': 'baya', # Или 'aidar', 'kseniya', 'natasha', 'xenia', 'eugene'
+        'tts_lang': 'ru',
         'silero_sample_rate': 48000,
         'system_prompt_key': 'SYSTEM_PROMPT_RU',
         'greeting': "Лиза на связи. Готов к работе."
     },
     'uz': {
         'vosk_model_path': os.path.join(_PROJECT_ROOT, 'vosk-model-small-uz-0.22'),
-        'silero_model_id': 'v3_1_ru', # <<< ЭТО НУЖНО ЗАМЕНИТЬ НА УЗБЕКСКУЮ МОДЕЛЬ SILERO, ЕСЛИ ОНА ЕСТЬ
-        'silero_speaker': 'baya',     # <<< ЭТО НУЖНО ЗАМЕНИТЬ НА УЗБЕКСКОГО СПИКЕРА SILERO, ЕСЛИ ОН ЕСТЬ
+        'silero_model_id': 'v3_uz', # <<< ЭТО НУЖНО ЗАМЕНИТЬ НА УЗБЕКСКУЮ МОДЕЛЬ SILERO, ЕСЛИ ОНА ЕСТЬ
+        'silero_speaker': 'dilnavoz',
+        'tts_lang': 'uz',
         'silero_sample_rate': 48000,
         'system_prompt_key': 'SYSTEM_PROMPT_UZ',
         'greeting': "Liza aloqada. Ishga tayyor." # Приветствие на узбекском
@@ -58,11 +59,15 @@ except ValueError:
 # Устройство для Silero TTS
 _tts_device = torch.device('cpu') # Или 'cuda' если есть GPU
 
-def _load_vosk_model(path):
+def _load_vosk_model(path, lang_code):
     """Вспомогательная функция для загрузки модели Vosk."""
     try:
         print(f"Загрузка Vosk модели из: {path}")
-        return vosk.Model(path)
+        model = vosk.Model(path)
+        # --- ВОТ ИСПРАВЛЕНИЕ ---
+        # Мы сами создаем атрибут lang_name и присваиваем ему код языка
+        model.lang_name = lang_code.upper()
+        return model
     except Exception as e:
         print(f"ОШИБКА: Не удалось найти или загрузить Vosk модель по пути '{path}'.")
         print("Убедитесь, что вы скачали, распаковали и положили ее в корень проекта.")
@@ -99,7 +104,7 @@ def init_language_system(llm_handler_module, prompt_module):
     config = LANG_CONFIG[_current_lang]
 
     # Загружаем Vosk модель
-    _current_vosk_model = _load_vosk_model(config['vosk_model_path'])
+    _current_vosk_model = _load_vosk_model(config['vosk_model_path'], _current_lang)
 
     # Загружаем Silero TTS модель
     _current_tts_model = _load_silero_tts_model(config['silero_model_id'], config['tts_lang'])
@@ -152,7 +157,7 @@ def switch_language(lang_code, llm_handler_module, prompt_module):
         config = LANG_CONFIG[_current_lang]
 
         # Перезагружаем Vosk модель
-        _current_vosk_model = _load_vosk_model(config['vosk_model_path'])
+        _current_vosk_model = _load_vosk_model(config['vosk_model_path'], _current_lang)
 
         # Перезагружаем Silero TTS модель
         _current_tts_model = _load_silero_tts_model(config['silero_model_id'], config['tts_lang'])

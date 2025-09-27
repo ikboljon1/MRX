@@ -2,42 +2,32 @@
 import torch
 import sounddevice as sd
 
-print("Инициализация TTS-модели (Silero)...")
+# Глобальная переменная для устройства, загружать здесь, а не в функции
+_tts_device = torch.device('cpu') # Или 'cuda' если есть GPU
 
-language = 'ru'
-model_id = 'v3_1_ru'
-device = torch.device('cpu')
-
-model, _ = torch.hub.load(repo_or_dir='snakers4/silero-models',
-                          model='silero_tts',
-                          language=language,
-                          speaker=model_id)
-model.to(device)
-
-# При первом запуске модель скачается, это может занять время.
-print("TTS-модель готова.")
-
-
-def speak(text):
+def speak(tts_model_obj, speaker_name, lang_code, text, sample_rate=48000):
     """
-    Преобразует текст в речь и воспроизводит его.
+    Преобразует текст в речь и воспроизводит его, используя заданную модель и параметры.
     """
     if not text:
         return
+    if tts_model_obj is None:
+        print("ОШИБКА: Silero TTS модель не загружена. Не могу говорить.")
+        return
 
-    print(f"MRX произносит: {text}")
+    # Мы оставляем lang_code в аргументах функции для удобства логирования
+    print(f"MRX произносит ({lang_code}, {speaker_name}): {text}")
 
-    # 'baya' - один из доступных голосов. Другие варианты: 'aidar', 'kseniya'
-    audio = model.apply_tts(text=text,
-                            speaker='baya',
-                            sample_rate=48000,
-                            put_accent=True,
-                            put_yo=True)
+    audio = tts_model_obj.apply_tts(text=text,
+                                    speaker=speaker_name,
+                                    # Аргумент language здесь не нужен, убираем его
+                                    sample_rate=sample_rate,
+                                    put_accent=True,
+                                    put_yo=True)
 
-    sd.play(audio, samplerate=48000)
-    sd.wait()  # Ждем, пока речь не закончится
-
-
-# Тест, если запустить файл напрямую
-if __name__ == '__main__':
-    speak("Привет, я Лиза. Проверка голосового модуля один, два, три.")
+    sd.play(audio, samplerate=sample_rate)
+    sd.wait()
+# Тест, если запустить файл напрямую - УДАЛЯЕМ, так как модель теперь загружается извне
+# if __name__ == '__main__':
+#     print("Этот модуль не запускается напрямую для тестирования TTS-модели.")
+#     print("Используйте main.py для полноценного тестирования.")
