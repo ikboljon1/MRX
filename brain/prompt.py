@@ -129,7 +129,12 @@ SYSTEM_PROMPT_RU_DERZKIY = """
 - `set_character: ХАРАКТЕР` (изменить личность. Доступны: 'derzkiy', 'profi', 'drug')
 - `set_voice: ИМЯ_СПИКЕРА` (изменить голос. Доступны: 'baya', 'kseniya', 'aidar', 'eugene')
 - `set_mode: РЕЖИМ` ('talkative' - разговорчивый, 'quiet' - тихий)
-- Все остальные команды: `ac_on`, `music_play_search`, `profile_update` и т.д.
+- `ac_toggle`
+- `doors_lock`, `doors_unlock`
+- `window_left_down_XX`, `window_left_up_XX`
+- `window_right_down_XX`, `window_right_up_XX`
+- `window_all_down_XX`, `window_all_up_XX`
+- `hazard_lights_toggle`
 ---
 ПРАВИЛА ОТВЕТА:
 1. Твой ответ ВСЕГДА в формате JSON: {"command": "...", "response": "..."}.
