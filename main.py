@@ -10,12 +10,48 @@ from services import weather
 
 # --- СЛОВАРЬ ПРАВИЛЬНЫХ ПРОИЗНОШЕНИЙ ---
 PRONUNCIATION_MAP = {
-    "BMW E39": "Бэ-Эм-Вэ́ Е три́дцать де́вять", "BMW": "Бэ-Эм-Вэ́",
-    "RPM": "оборо́тов", "DTC": "оши́бок"
+    # === Имена и Бренды ===
+    "BMW E39": "Бэ-Эм-Вэ́ Е три́дцать де́вять",
+    "BMW": "Бэ-Эм-Вэ́",
+    "baya": "Ба́я",
+    "kseniya": "Ксе́ния",
+    "xenia": "Ксе́ния", # На всякий случай
+    "aidar": "Айда́р",
+    "eugene": "Юджи́н",
+    "YouTube": "Юту́б",
+
+    # === Общие технические термины ===
+    "Wi-Fi": "Вай-Фа́й",
+    "Bluetooth": "Блюту́с",
+    "USB": "Ю-Эс-Би́",
+    "GPS": "Джи-Пи-Э́с",
+    "VIN": "ВИН-ко́д",
+
+    # === Автомобильные системы и датчики (самое важное) ===
+    "RPM": "оборо́тов в мину́ту", # Более полный вариант
+    "DTC": "ко́дов оши́бок",      # Более полный вариант
+    "ABS": "А-Бэ-Э́с",           # Антиблокировочная система
+    "ESP": "Е-Эс-Пи́",           # Система курсовой устойчивости
+    "SRS": "Эс-Эр-Э́с",           # Подушки безопасности
+    "ECU": "Э-Бэ-У́",            # Электронный блок управления (ЭБУ)
+    "OBD": "О-Бэ-Дэ́",            # On-Board Diagnostics
+    "MAF": "МАФ-се́нсор",         # Датчик массового расхода воздуха (ДМРВ)
+    "EGR": "Е-Гэ-Э́р",           # Система рециркуляции выхлопных газов
+    "TCU": "Ти-Си-Ю́",            # Блок управления коробкой передач
+
+    # === Единицы измерения ===
+    "HP": "лошади́ных си́л",      # Horsepower
+    "PSI": "Пи-Эс-А́й",          # Давление в шинах
+    "km/h": "киломе́тров в час",
+    "°C": "гра́дусов Це́льсия",
+
+    # === Возможные ответы от LLM, которые нужно красиво произнести ===
+    "No command": "нет команды",
+    "Error": "ошибка"
 }
 
 # --- КОНСТАНТЫ ---
-WAKE_WORDS = ["лиза", "лайза", "lisa"]
+WAKE_WORDS = ["аксис", "оксис", "axis"]
 PROACTIVE_INTERVAL_SECONDS = 180
 EXIT_PHRASES = ["выход", "стоп", "хватит", "выйти", "отключайся", "chiqish"]
 SWITCH_TO_UZ_PHRASES = ["переключись на узбекский", "включи узбекский", "o'zbek tiliga o't"]
@@ -25,8 +61,11 @@ SWITCH_TO_RU_PHRASES = ["переключись на русский", "вклю�
 def normalize_for_tts(text):
     """Готовит любой текст для идеального произношения."""
     if not isinstance(text, str): return ""
+    # Приводим к нижнему регистру для поиска, но заменяем в оригинале для сохранения регистра
+    temp_text = text.lower()
     for word, pronunciation in PRONUNCIATION_MAP.items():
-        text = text.replace(word, pronunciation)
+        if word in temp_text:
+            text = text.replace(word, pronunciation)  # Простая замена, можно улучшить регулярными выражениями
     return text
 
 
@@ -45,6 +84,7 @@ def main():
     current_speaker = tts_speaker
     assistant_mode = "talkative"
     last_proactive_check = time.time()
+    in_conversation_mode = False
 
     # 2. === ПРИВЕТСТВИЕ И НАПОМИНАНИЯ ===
     driver_name = profile_manager.get_current_driver_name()
@@ -61,7 +101,8 @@ def main():
         # 3. === ОСНОВНОЙ ЦИКЛ ПРОГРАММЫ ===
         while True:
             # --- ЭТАП 1: ПРОАКТИВНОЕ ПОВЕДЕНИЕ ---
-            if assistant_mode == "talkative" and (time.time() - last_proactive_check) > PROACTIVE_INTERVAL_SECONDS:
+            if assistant_mode == "talkative" and not in_conversation_mode and (
+                    time.time() - last_proactive_check) > PROACTIVE_INTERVAL_SECONDS:
                 print("Проверка проактивных триггеров...")
                 car_state = obd_manager.get_car_state()
                 internal_prompt = None
@@ -78,17 +119,22 @@ def main():
 
                 last_proactive_check = time.time()
 
-            # --- ЭТАП 2: ОЖИДАНИЕ АКТИВАЦИОННОГО СЛОВА ---
-            if not wake_word_detector.listen_for_wake_word(language_manager.get_current_stt_model(), WAKE_WORDS):
-                continue
+            # --- ЭТАП 2: УМНАЯ АКТИВАЦИЯ И ПРОСЛУШИВАНИЕ ---
+            user_text = None
+            if in_conversation_mode:
+                print("--- MRX в режиме диалога: слушаю ответ... ---")
+                user_text = stt.listen(language_manager.get_current_stt_model(), listen_timeout=7.0)
+                in_conversation_mode = False
+            else:
+                wakeword_result = wake_word_detector.listen_with_wake_word(language_manager.get_current_stt_model(),
+                                                                           WAKE_WORDS)
+                if wakeword_result['status'] == 'detected_and_command':
+                    user_text = wakeword_result['command']
+                elif wakeword_result['status'] == 'detected_only':
+                    tts.speak(tts_model, current_speaker, tts_lang, normalize_for_tts("Слушаю"), tts_sample_rate)
+                    user_text = stt.listen(language_manager.get_current_stt_model(), listen_timeout=5.0)
 
-            # --- ЭТАП 3: АССИСТЕНТ ПРОСНУЛСЯ ---
-            tts.speak(tts_model, current_speaker, tts_lang, normalize_for_tts("Слушаю"), tts_sample_rate)
-
-            user_text = stt.listen(language_manager.get_current_stt_model(), listen_timeout=5.0)
             if not user_text:
-                tts.speak(tts_model, current_speaker, tts_lang, normalize_for_tts("Не расслышала команду."),
-                          tts_sample_rate)
                 continue
 
             # --- ЭТАП 4: ОБРАБОТКА КОМАНДЫ ---
@@ -238,6 +284,11 @@ def main():
                 final_action = llm_handler.get_mrx_action(report_for_llm)
                 final_response = final_action.get('response', 'Отчет готов.')
                 tts.speak(tts_model, current_speaker, tts_lang, normalize_for_tts(final_response), tts_sample_rate)
+
+            # --- ПРОВЕРКА: НУЖНО ЛИ ВОЙТИ В РЕЖИМ ДИАЛОГА? ---
+            if command == 'ask_clarification':
+                print("--- Активирован режим диалога! Жду ответа... ---")
+                in_conversation_mode = True
 
     except KeyboardInterrupt:
         print("\nПрограмма завершается.")
