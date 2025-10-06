@@ -24,8 +24,7 @@ LANG_CONFIG = {
         'silero_speaker': 'baya', # Или 'aidar', 'kseniya', 'natasha', 'xenia', 'eugene'
         'tts_lang': 'ru',
         'silero_sample_rate': 48000,
-        'system_prompt_key': 'SYSTEM_PROMPT_RU',
-        'greeting': "Лиза на связи. Готов к работе."
+        'system_prompt_key': 'SYSTEM_PROMPT_RU_DERZKIY',
     },
     'uz': {
         'vosk_model_path': os.path.join(_PROJECT_ROOT, 'vosk-model-small-uz-0.22'),
@@ -34,7 +33,6 @@ LANG_CONFIG = {
         'tts_lang': 'uz',
         'silero_sample_rate': 48000,
         'system_prompt_key': 'SYSTEM_PROMPT_UZ',
-        'greeting': "Liza aloqada. Ishga tayyor." # Приветствие на узбекском
     }
 }
 
@@ -137,9 +135,6 @@ def get_current_tts_params():
     """Возвращает параметры для Silero TTS: модель, спикера, язык, частоту."""
     return _current_tts_model, _current_tts_speaker, _current_tts_lang, _current_tts_sample_rate
 
-def get_current_greeting():
-    """Возвращает приветствие для текущего языка."""
-    return LANG_CONFIG[_current_lang]['greeting']
 
 def switch_language(lang_code, llm_handler_module, prompt_module):
     """Переключает язык системы."""
