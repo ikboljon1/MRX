@@ -9,6 +9,8 @@ SYSTEM_PROMPT_RU_DERZKIY = """
 - `set_character: ХАРАКТЕР` (изменить личность. Доступны: 'derzkiy', 'profi', 'drug', 'lovelas')
 - `set_voice: ИМЯ_СПИКЕРА` (изменить голос. Доступны: 'baya', 'kseniya', 'aidar', 'eugene')
 - `set_mode: РЕЖИМ` ('talkative' - разговорчивый, 'quiet' - тихий)
+- `set_tts_engine: ДВИЖОК` (изменить движок синтеза. Доступны: 'silero', 'piper')
+- `set_tts_engine: ДВИЖОК` (изменить движок синтеза. Доступны: 'silero', 'piper')
 
 --- Управление Автомобилем ---
 - `ac_toggle` (переключить состояние кондиционера)
@@ -55,6 +57,7 @@ SYSTEM_PROMPT_RU_PROFI = """
 - `set_character: ХАРАКТЕР` (изменить личность. Доступны: 'derzkiy', 'profi', 'drug', 'lovelas')
 - `set_voice: ИМЯ_СПИКЕРА` (изменить голос. Доступны: 'baya', 'kseniya', 'aidar', 'eugene')
 - `set_mode: РЕЖИМ` ('talkative' - разговорчивый, 'quiet' - тихий)
+- `set_tts_engine: ДВИЖОК` (изменить движок синтеза. Доступны: 'silero', 'piper')
 
 --- Управление Автомобилем ---
 - `ac_toggle` (переключить состояние кондиционера)
@@ -100,6 +103,7 @@ SYSTEM_PROMPT_RU_DRUG = """
 - `set_character: ХАРАКТЕР` (изменить личность. Доступны: 'derzkiy', 'profi', 'drug', 'lovelas')
 - `set_voice: ИМЯ_СПИКЕРА` (изменить голос. Доступны: 'baya', 'kseniya', 'aidar', 'eugene')
 - `set_mode: РЕЖИМ` ('talkative' - разговорчивый, 'quiet' - тихий)
+- `set_tts_engine: ДВИЖОК` (изменить движок синтеза. Доступны: 'silero', 'piper')
 
 --- Управление Автомобилем ---
 - `ac_toggle` (переключить состояние кондиционера)
@@ -147,6 +151,7 @@ SYSTEM_PROMPT_RU_LOVELAS = """
 - `set_character: ХАРАКТЕР` (изменить личность. Доступны: 'derzkiy', 'profi', 'drug', 'lovelas')
 - `set_voice: ИМЯ_СПИКЕРА` (изменить голос. Доступны: 'baya', 'kseniya', 'aidar', 'eugene')
 - `set_mode: РЕЖИМ` ('talkative' - разговорчивый, 'quiet' - тихий)
+- `set_tts_engine: ДВИЖОК` (изменить движок синтеза. Доступны: 'silero', 'piper')
 
 --- Управление Автомобилем ---
 - `ac_toggle` (переключить состояние кондиционера)
