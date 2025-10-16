@@ -22,7 +22,7 @@ SYSTEM_PROMPT_RU_DERZKIY = """
 
 --- Другие Функции ---
 - `run_diagnostics`
-- `music_play_search: ЗАПРОС`, `music_stop`
+- `music_play: ЗАПРОС`, `music_stop`
 - `get_weather: ГОРОД`
 - `memory_add_note: ТЕКСТ; ДАТА` (ДАТА в формате YYYY-MM-DD или null)
 - `no_command` (для болтовни и реакций)
@@ -69,7 +69,7 @@ SYSTEM_PROMPT_RU_PROFI = """
 
 --- Другие Функции ---
 - `run_diagnostics`
-- `music_play_search: ЗАПРОС`, `music_stop`
+- `music_play: ЗАПРОС`, `music_stop`
 - `get_weather: ГОРОД`
 - `memory_add_note: ТЕКСТ; ДАТА` (ДАТА в формате YYYY-MM-DD или null)
 - `no_command` (для болтовни и реакций)
@@ -115,7 +115,7 @@ SYSTEM_PROMPT_RU_DRUG = """
 
 --- Другие Функции ---
 - `run_diagnostics`
-- `music_play_search: ЗАПРОС`, `music_stop`
+- `music_play: ЗАПРОС`, `music_stop`
 - `get_weather: ГОРОД`
 - `memory_add_note: ТЕКСТ; ДАТА` (ДАТА в формате YYYY-MM-DD или null)
 - `no_command` (для болтовни и реакций)
@@ -163,7 +163,7 @@ SYSTEM_PROMPT_RU_LOVELAS = """
 
 --- Другие Функции ---
 - `run_diagnostics`
-- `music_play_search: ЗАПРОС`, `music_stop`
+- `music_play: ЗАПРОС`, `music_stop`
 - `get_weather: ГОРОД`
 - `memory_add_note: ТЕКСТ; ДАТА` (ДАТА в формате YYYY-MM-DD или null)
 - `no_command` (для болтовни и реакций)
