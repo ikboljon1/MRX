@@ -25,6 +25,29 @@ GREETINGS = {
     ]
 }
 
+ACTION_FILLERS = {
+    'derzkiy': ["Делаю.", "Принято.", "Уже выполняю.", "Будет сделано."],
+    'profi': ["Выполняю, сэр.", "Слушаюсь.", "Команда принята."],
+    'drug': ["Без проблем, бро.", "Окей, делаю.", "Сейчас будет.", "Принял."],
+    'lovelas': ["Для тебя — что угодно.", "Сейчас всё устроим.", "Считай, уже сделано."]
+}
+
+# Фразы для вопросов и болтовни
+THINKING_FILLERS = {
+    'derzkiy': ["Так, посмотрим...", "Ща, прикину.", "Обрабатываю твой запрос.", "Думаю..."],
+    'profi': ["Минуту, сэр.", "Обрабатываю информацию.", "Секунду."],
+    'drug': ["Так-так-так...", "Ага, ща соображу.", "Дай-ка подумать..."],
+    'lovelas': ["Так, посмотрим, что тут у нас...", "Оцениваю обстановку...", "Хм, интересный вопрос..."]
+}
+
+
+# Ключевые слова, которые указывают на прямое действие
+ACTION_KEYWORDS = [
+    'включи', 'выключи', 'открой', 'закрой', 'подними', 'опусти', 'поставь',
+    'активируй', 'деактивируй', 'установи', 'смени', 'переключи', 'заблокируй',
+    'разблокируй', 'найти', 'поищи', 'проверь'
+]
+
 
 def get_dynamic_greeting(character='derzkiy', name='водитель'):
     """
@@ -41,6 +64,24 @@ def get_dynamic_greeting(character='derzkiy', name='водитель'):
     return chosen_greeting.format(name=name)
 
 
+def get_filler_phrase(character, user_text):
+    """
+    Возвращает случайную фразу-филлер, анализируя текст запроса.
+    """
+    user_text_lower = user_text.lower()
+
+    # Проверяем, есть ли в запросе слова-действия
+    is_action = any(keyword in user_text_lower for keyword in ACTION_KEYWORDS)
+
+    if is_action:
+        # Если это команда, берем фразу из ACTION_FILLERS
+        filler_list = ACTION_FILLERS.get(character, ACTION_FILLERS['derzkiy'])
+    else:
+        # Если это вопрос или болтовня, берем из THINKING_FILLERS
+        filler_list = THINKING_FILLERS.get(character, THINKING_FILLERS['derzkiy'])
+
+    return random.choice(filler_list)
+
 # --- Тестовый блок ---
 if __name__ == '__main__':
     print("--- Тест Дерзкого ---")
@@ -54,3 +95,9 @@ if __name__ == '__main__':
 
     print("\n--- Тест Ловеласа ---")
     print(get_dynamic_greeting('lovelas', 'Казанова'))
+
+    print("\n--- Тест Филлеров ---")
+    print(f"Дерзкий: {get_filler_phrase('derzkiy')}")
+    print(f"Профи: {get_filler_phrase('profi')}")
+    print(f"Друг: {get_filler_phrase('drug')}")
+    print(f"Ловелас: {get_filler_phrase('lovelas')}")

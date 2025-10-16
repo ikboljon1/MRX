@@ -12,11 +12,15 @@ import language_manager
 from services import weather
 from brain import vision_manager
 from memory import people_manager
+from services import network_manager
+from brain import offline_handler
+from services import system_monitor
 
 # --- СЛОВАРЬ ПРАВИЛЬНЫХ ПРОИЗНОШЕНИЙ (без изменений) ---
 PRONUNCIATION_MAP = {
     # === Имена и Бренды ===
     "BMW E39": "Бэ-Эм-Вэ́ Е три́дцать де́вять",
+    "E39":"Е три́дцать де́вять",
     "BMW": "Бэ-Эм-Вэ́",
     "baya": "Ба́я",
     "kseniya": "Ксе́ния",
@@ -56,7 +60,7 @@ PRONUNCIATION_MAP = {
 }
 
 # --- КОНСТАНТЫ (_MODIFIED: Убрали WAKE_WORDS, добавили порог) ---
-PROACTIVE_INTERVAL_SECONDS = 30
+PROACTIVE_INTERVAL_SECONDS = 120
 # WAKE_WORDS больше не нужен здесь, он настраивается в wake_word_detector.py
 EXIT_PHRASES = ["выход", "стоп", "хватит", "выйти", "отключайся", "chiqish"]
 EXIT_PHRASES_THRESHOLD = 85  # _NEW: Порог схожести для команды выхода
@@ -116,10 +120,18 @@ def main():
         while True:
             # --- ЭТАП 1: ПРОАКТИВНЫЙ АНАЛИЗ И АДАПТАЦИЯ (без изменений) ---
             if not in_conversation_mode and (time.time() - last_proactive_check) > PROACTIVE_INTERVAL_SECONDS:
+                last_proactive_check = time.time()  # Переносим эту строку в начало блока
+
+                print("\n[INFO] Проактивный анализ системы...")
+                # --- НОВЫЙ БЛОК МОНИТОРИНГА ---
+                health_status = system_monitor.check_system_health()
+                if health_status['warnings']:
+                    # Если есть предупреждения, озвучиваем первое из них
+                    warning_to_speak = health_status['warnings'][0]
+                    speak_response(warning_to_speak, tts_params)
+                # --------------------------------
+
                 print("\n[INFO] Проактивный анализ салона (Зрение)...")
-                # ... Вся ваша логика с vision_manager, девушками, знакомством и т.д.
-                # ... остается здесь без каких-либо изменений.
-                # ... Я ее скрою для краткости, но вы ее не удаляйте.
                 detected_people = vision_manager.identify_and_analyze_people()
                 genders_in_car = {p.get('gender', 'Unknown') for p in detected_people}
                 if 'Woman' in genders_in_car and current_character != 'lovelas':
@@ -195,9 +207,24 @@ def main():
                 continue
 
             # --- ЭТАП 4: ПОЛУЧЕНИЕ ОТВЕТА ОТ "МОЗГА" ---
-            car_state = obd_manager.get_car_state()
-            context_for_llm = f"""[ДАННЫЕ АВТО: Обороты: {car_state.get('rpm', 'N/A')} RPM] [ЗАПРОС: {user_text}]"""
-            action = llm_handler.get_mrx_action(context_for_llm)
+            action = None
+            if network_manager.is_internet_available():
+                print("[BRAIN] Интернет доступен. Использую онлайн мозг (LLM)...")
+                car_state = obd_manager.get_car_state()
+                context_for_llm = f"""[ДАННЫЕ АВТО: Обороты: {car_state.get('rpm', 'N/A')} RPM] [ЗАПРОС: {user_text}]"""
+                action = llm_handler.get_mrx_action(context_for_llm)
+            else:
+                print("[BRAIN] Интернет недоступен. Использую оффлайн обработчик...")
+                action = offline_handler.recognize_command(user_text)
+
+            # Если ни один мозг не смог обработать команду
+            if action is None:
+                print("[BRAIN] Команда не распознана ни одним из режимов.")
+                # Создаем "пустышку", чтобы программа не упала
+                action = {
+                    'command': 'no_command',
+                    'response': "Прости, я не понял тебя, а мой основной мозг сейчас не в сети."
+                }
             command = action.get('command')
             response_text = action.get('response', 'Что-то пошло не так...')
 

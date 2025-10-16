@@ -21,7 +21,7 @@ LANG_CONFIG = {
     'ru': {
         'vosk_model_path': os.path.join(_PROJECT_ROOT, 'vosk-model-small-ru-0.22'),
         'silero_model_id': 'v3_1_ru', # Для русского используем ru модель Silero
-        'silero_speaker': 'baya', # Или 'aidar', 'kseniya', 'natasha', 'xenia', 'eugene'
+        'silero_speaker': 'eugene', # Или 'aidar', 'kseniya', 'natasha', 'xenia', 'eugene'
         'tts_lang': 'ru',
         'silero_sample_rate': 48000,
         'system_prompt_key': 'SYSTEM_PROMPT_RU_DERZKIY',

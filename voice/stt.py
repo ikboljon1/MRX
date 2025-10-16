@@ -1,86 +1,91 @@
-# voice/stt.py (Версия с VAD)
-import webrtcvad
-import collections
-import queue
+# voice/stt.py (ФИНАЛЬНАЯ ВЕРСИЯ 3.0: Полностью оффлайн, правильный CHUNK_SIZE)
+import torch
 import sounddevice as sd
 import vosk
 import json
+import numpy as np
+import time
+import os  # <-- Добавляем os для работы с путями
 
-# --- НАСТРОЙКИ VAD ---
-VAD_AGGRESSIVENESS = 2  # от 0 (наименее агрессивный) до 3 (наиболее агрессивный)
-FRAME_DURATION_MS = 30  # Длительность одного аудио-фрейма (VAD работает с 10, 20 или 30 мс)
+# --- НАСТРОЙКИ ---
 SAMPLE_RATE = 16000
-CHUNK_SIZE = int(SAMPLE_RATE * FRAME_DURATION_MS / 1000)
-SILENCE_DURATION_S = 1.5  # Сколько секунд тишины считать концом фразы
-MAX_RECORD_S = 10.0  # Максимальная длительность записи, чтобы не слушать вечно
+# _ИСПРАВЛЕНО_: Устанавливаем CHUNK_SIZE, который требует Silero VAD для 16000 Гц
+CHUNK_SIZE = 512
 
-q = queue.Queue()
+# --- Умное определение пути к проекту ---
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+# --- ЗАГРУЗКА VAD МОДЕЛИ (полностью оффлайн) ---
+_vad_model, _utils = None, None
+try:
+    print("Загрузка модели Silero VAD из локального репозитория...")
+    # _ИСПРАВЛЕНО_: Используем тот же оффлайн-подход, что и для TTS
+    local_repo_path = os.path.join(_PROJECT_ROOT, 'snakers4_silero-vad_master')
 
-def callback(indata, frames, time, status):
-    if status:
-        print(status, flush=True)
-    q.put(bytes(indata))
+    if not os.path.exists(local_repo_path):
+        print(f"!!! ОШИБКА: Локальный репозиторий Silero VAD не найден по пути: {local_repo_path}")
+        print("!!! Запустите программу один раз с доступом в интернет, чтобы он скачался.")
+        # Первый раз оставляем возможность скачать
+        torch.hub.set_dir('.')
+        _vad_model, _utils = torch.hub.load(repo_or_dir='snakers4_silero-vad', model='silero_vad')
+    else:
+        _vad_model, _utils = torch.hub.load(repo_or_dir=local_repo_path,
+                                            model='silero_vad',
+                                            source='local')
+    print("Модель Silero VAD успешно загружена.")
+except Exception as e:
+    print(f"КРИТИЧЕСКАЯ ОШИБКА при загрузке Silero VAD: {e}")
+
+(get_speech_timestamps, _, _, VADIterator, _) = _utils
 
 
 def listen(vosk_model_obj):
-    """
-    Слушает микрофон, используя VAD для определения конца фразы.
-    Возвращает распознанный текст.
-    """
-    if vosk_model_obj is None:
-        print("ОШИБКА: Vosk модель не загружена. Не могу слушать.")
+    if not vosk_model_obj or not _vad_model:
+        print("ОШИБКА: Одна из моделей (Vosk или VAD) не загружена.")
         return ""
 
-    vad = webrtcvad.Vad(VAD_AGGRESSIVENESS)
     recognizer = vosk.KaldiRecognizer(vosk_model_obj, SAMPLE_RATE)
+    vad_iterator = VADIterator(_vad_model)
 
-    padding_duration_ms = int(SILENCE_DURATION_S * 1000)
-    ring_buffer_size = padding_duration_ms // FRAME_DURATION_MS
-    ring_buffer = collections.deque(maxlen=ring_buffer_size)
+    print(f"\nСлушаю (Silero VAD + Vosk)... Говорите.")
 
-    triggered = False
-    voiced_frames = []
+    with sd.InputStream(samplerate=SAMPLE_RATE, blocksize=CHUNK_SIZE, device=None, dtype='float32',
+                        channels=1) as stream:
 
-    print(f"\nСлушаю на языке {vosk_model_obj.lang_name} (режим VAD)... Говорите.")
+        while True:  # Ждем начала речи
+            audio_chunk, _ = stream.read(CHUNK_SIZE)
+            audio_chunk_tensor = torch.from_numpy(audio_chunk.flatten())
+            speech_dict = vad_iterator(audio_chunk_tensor, return_seconds=True)
+            if speech_dict and 'start' in speech_dict:
+                print("-> Речь обнаружена...")
+                break
 
-    with sd.RawInputStream(samplerate=SAMPLE_RATE, blocksize=CHUNK_SIZE, device=None,
-                           dtype='int16', channels=1, callback=callback):
+        start_time = time.perf_counter()
 
-        num_silence_frames = 0
-        max_frames = int(MAX_RECORD_S * SAMPLE_RATE / CHUNK_SIZE)
+        first_chunk_int16 = (audio_chunk * 32768).astype(np.int16)
+        recognizer.AcceptWaveform(first_chunk_int16.tobytes())
 
-        for _ in range(max_frames):
-            frame = q.get()
-            is_speech = vad.is_speech(frame, SAMPLE_RATE)
+        while True:  # Слушаем до конца речи
+            audio_chunk, _ = stream.read(CHUNK_SIZE)
+            audio_chunk_int16 = (audio_chunk * 32768).astype(np.int16)
+            recognizer.AcceptWaveform(audio_chunk_int16.tobytes())
 
-            if not triggered:
-                ring_buffer.append((frame, is_speech))
-                if any(f[1] for f in ring_buffer):
-                    triggered = True
-                    print("-> Обнаружена речь, начинаю запись...")
-                    for f, s in ring_buffer:
-                        if s:
-                            voiced_frames.append(f)
-                    ring_buffer.clear()
-            else:
-                voiced_frames.append(frame)
-                if not is_speech:
-                    num_silence_frames += 1
-                    if num_silence_frames * FRAME_DURATION_MS / 1000 > SILENCE_DURATION_S:
-                        print("-> Обнаружена тишина, конец фразы.")
-                        break
-                else:
-                    num_silence_frames = 0
+            audio_chunk_tensor = torch.from_numpy(audio_chunk.flatten())
+            speech_dict = vad_iterator(audio_chunk_tensor, return_seconds=True)
+            if speech_dict and 'end' in speech_dict:
+                print("-> Тишина, конец фразы.")
+                vad_iterator.reset_states()
+                break
 
-    print("Обработка записанного фрагмента...")
-    full_audio = b''.join(voiced_frames)
-    recognizer.AcceptWaveform(full_audio)
-    result = json.loads(recognizer.FinalResult())
-    text = result.get('text', '')
+    end_time = time.perf_counter()
+    print(f"[PERF] Прослушивание и VAD заняли: {end_time - start_time:.4f} сек.")
+
+    result_json = recognizer.FinalResult()
+    result_dict = json.loads(result_json)
+    text = result_dict.get('text', '')
 
     if text:
-        print(f"Распознано (VAD): '{text}'")
+        print(f"Распознано (Vosk): '{text}'")
     else:
         print("Ничего не распознано.")
 

@@ -1,4 +1,5 @@
 # mrx_project/voice/wake_word_detector.py
+import asyncio
 import os
 import struct
 import pvporcupine
@@ -51,20 +52,44 @@ def initialize_detector():
 
 def listen_for_wake_word():
     """
-    Блокирующая функция. Слушает аудиопоток и возвращает True, как только услышит активационное слово.
+    Блокирующая функция, которая слушает аудиопоток до тех пор,
+    пока не будет обнаружено активационное слово.
+    Предназначена для вызова из синхронного кода или через run_in_executor.
     """
+    # Мы не передаем media_player, так как в этой простой версии
+    # мы не можем управлять им. Пауза музыки обрабатывается в `run_detector_in_background`.
+    # Для простого ожидания слова этого достаточно.
     if not porcupine or not audio_stream:
-        print("ОШИБКА: Детектор не был инициализирован.")
-        return False
+        print("ОШИКА: Детектор не инициализирован.")
+        return
 
+    try:
+        while True:
+            pcm = audio_stream.read(porcupine.frame_length, exception_on_overflow=False)
+            pcm = struct.unpack_from("h" * porcupine.frame_length, pcm)
+
+            keyword_index = porcupine.process(pcm)
+            if keyword_index >= 0:
+                print(">>> Активационное слово услышано! (из listen_for_wake_word)")
+                return # Выходим из функции, когда слово найдено
+    except KeyboardInterrupt:
+        print("Остановка ожидания активационного слова.")
+        return
+
+
+async def run_detector_in_background(wake_word_event, media_player_module, loop):
+    """
+    Главная функция для фоновой задачи. Вечно слушает активационное слово.
+    """
+    print("[WAKE_WORD] Фоновый детектор запущен.")
     while True:
-        pcm = audio_stream.read(porcupine.frame_length)
-        pcm = struct.unpack_from("h" * porcupine.frame_length, pcm)
-
-        keyword_index = porcupine.process(pcm)
-        if keyword_index >= 0:
-            print(">>> Активационное слово услышано!")
-            return True
+        # Запускаем блокирующий код в отдельном потоке, чтобы не морозить asyncio
+        found = await loop.run_in_executor(None, _listen_and_process_frame, media_player_module)
+        if found:
+            # Отправляем сигнал основному циклу, что пора начинать диалог
+            wake_word_event.set()
+        # Даем другим задачам шанс выполниться
+        await asyncio.sleep(0.01)
 
 
 def shutdown_detector():
