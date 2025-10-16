@@ -1,37 +1,43 @@
 # mrx_project/voice/tts.py
 import torch
 import sounddevice as sd
-import time  # <-- ДОБАВЛЯЕМ ИМПОРТ
+import time
 
 # Глобальная переменная для устройства
-_tts_device = torch.device('cpu')  # Или 'cuda' если есть GPU
+_tts_device = torch.device('cpu')
 
 
-def speak(tts_model_obj, speaker_name, lang_code, text, sample_rate=48000):
+def speak(model, text, speaker='eugene', sample_rate=48000):
     """
-    Преобразует текст в речь и воспроизводит его, измеряя время генерации.
+    Преобразует текст в речь и воспроизводит его.
+    Теперь принимает модель и текст как основные аргументы.
     """
     if not text:
         return
-    if tts_model_obj is None:
+    if model is None:
         print("ОШИБКА: Silero TTS модель не загружена. Не могу говорить.")
         return
 
-    print(f"MRX произносит ({lang_code}, {speaker_name}): {text}")
+    # Изменили логгер, чтобы он явно показывал спикера
+    print(f"MRX ({speaker}) произносит: {text}")
 
-    # --- ИЗМЕРЕНИЕ ВРЕМЕНИ ГЕНЕРАЦИИ ---
     gen_start_time = time.perf_counter()
 
-    audio = tts_model_obj.apply_tts(text=text,
-                                    speaker=speaker_name,
-                                    sample_rate=sample_rate,
-                                    put_accent=True,
-                                    put_yo=True)
+    try:
+        audio = model.apply_tts(text=text,
+                                speaker=speaker,
+                                sample_rate=sample_rate,
+                                put_accent=True,
+                                put_yo=True)
 
-    gen_end_time = time.perf_counter()
-    gen_duration = gen_end_time - gen_start_time
-    print(f"[PERF] TTS Generation took: {gen_duration:.4f} seconds")
-    # ------------------------------------
+        gen_end_time = time.perf_counter()
+        gen_duration = gen_end_time - gen_start_time
+        print(f"[PERF] TTS Generation took: {gen_duration:.4f} seconds")
 
-    sd.play(audio, samplerate=sample_rate)
-    sd.wait()
+        sd.play(audio, samplerate=sample_rate)
+        sd.wait()
+
+    except Exception as e:
+        print(f"!!! ОШИБКА TTS: Не удалось синтезировать речь: {e}")
+        # Это может случиться, если LLM вернет текст с неподдерживаемыми символами
+        # или если модель TTS не сможет его обработать.

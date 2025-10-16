@@ -18,17 +18,7 @@ import multiprocessing as mp
 from brain import vision_worker
 import queue
 
-# --- СЛОВАРЬ ПРАВИЛЬНЫХ ПРОИЗНОШЕНИЙ ---
-PRONUNCIATION_MAP = {
-    "BMW E39": "Бэ-Эм-Вэ́ Е три́дцать де́вять", "E39": "Е три́дцать де́вять", "BMW": "Бэ-Эм-Вэ́",
-    "baya": "Ба́я", "kseniya": "Ксе́ния", "xenia": "Ксе́ния", "aidar": "Айда́р", "eugene": "Евгений",
-    "YouTube": "Юту́б", "Wi-Fi": "Вай-Фа́й", "Bluetooth": "Блюту́с", "USB": "Ю-Эс-Би́",
-    "GPS": "Джи-Пи-Э́с", "VIN": "ВИН-ко́д", "RPM": "оборо́тов в мину́ту", "DTC": "ко́дов оши́бок",
-    "ABS": "А-Бэ-Э́с", "ESP": "Е-Эс-Пи́", "SRS": "Эс-Эр-Э́с", "ECU": "Э-Бэ-У́", "OBD": "О-Бэ-Дэ́",
-    "MAF": "МАФ-се́нсор", "EGR": "Е-Гэ-Э́р", "TCU": "Ти-Си-Ю́", "HP": "лошади́ных си́л",
-    "PSI": "Пи-Эс-А́й", "km/h": "киломе́тров в час", "°C": "гра́дусов Це́льсия",
-    "No command": "нет команды", "Error": "ошибка"
-}
+
 
 # --- КОНСТАНТЫ ---
 PROACTIVE_INTERVAL_SECONDS = 120
@@ -38,20 +28,17 @@ SWITCH_TO_UZ_PHRASES = ["переключись на узбекский", "вк�
 SWITCH_TO_RU_PHRASES = ["переключись на русский", "включи русский", "rus tiliga o't"]
 
 
-# --- ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ---
-def normalize_for_tts(text):
-    if not isinstance(text, str): return ""
-    temp_text = text.lower()
-    for word, pronunciation in PRONUNCIATION_MAP.items():
-        if word in temp_text: text = text.replace(word, pronunciation)
-    return text
-
-
 def speak_response(text, tts_params):
-    if not text or not isinstance(text, str): return
-    model, speaker, lang, rate = tts_params
-    normalized_text = normalize_for_tts(text)
-    tts.speak(model, speaker, lang, normalized_text, rate)
+    """Эта функция теперь является оберткой, которая правильно вызывает tts.speak"""
+    if not text or not isinstance(text, str):
+        return
+
+    # Распаковываем параметры из tts_params
+    model, speaker, _, sample_rate = tts_params  # lang больше не передаем напрямую в speak
+
+    # --- ИСПРАВЛЕННЫЙ ВЫЗОВ ---
+    # Передаем model и text, а speaker и sample_rate как именованные аргументы
+    tts.speak(model=model, text=text, speaker=speaker, sample_rate=sample_rate)
 
 
 async def run_in_thread(blocking_func, *args):
