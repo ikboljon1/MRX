@@ -24,8 +24,6 @@ import queue
 PROACTIVE_INTERVAL_SECONDS = 120
 EXIT_PHRASES = ["выход", "стоп", "хватит", "выйти", "отключайся", "chiqish"]
 EXIT_PHRASES_THRESHOLD = 85
-SWITCH_TO_UZ_PHRASES = ["переключись на узбекский", "включи узбекский", "o'zbek tiliga o't"]
-SWITCH_TO_RU_PHRASES = ["переключись на русский", "включи русский", "rus tiliga o't"]
 
 
 def speak_response(text, tts_params):
@@ -59,57 +57,57 @@ async def stt_listen_async(model):
     return await run_in_thread(stt.listen, model)
 
 
-async def proactive_task(state, vision_task_queue, vision_result_queue):
-    while True:
-        await asyncio.sleep(PROACTIVE_INTERVAL_SECONDS)
-        if state['in_conversation_mode']:
-            continue
-
-        print("\n[PROACTIVE_TASK] Запуск фоновой проверки...")
-        vision_task_queue.put("analyze")
-        try:
-            detected_people = vision_result_queue.get_nowait()
-            print("[PROACTIVE_TASK] Получен результат анализа зрения!")
-            genders_in_car = {p.get('gender', 'Unknown') for p in detected_people}
-            current_character = state['current_character']
-            tts_params = state['tts_params']
-
-            if 'Woman' in genders_in_car and current_character != 'lovelas':
-                print("[ADAPT] Обнаружена девушка! -> Режим 'Ловелас'.")
-                state['current_character'] = 'lovelas'
-                state['listening_mode'] = 'CONSTANT'
-                llm_handler.reload_chat_session(prompt.PROMPTS_BY_CHARACTER['lovelas'])
-                await speak_response_async("Так-так... Кажется, обстановка накаляется. Включаю режим обаяния.",
-                                           tts_params)
-
-            elif 'Woman' not in genders_in_car and current_character == 'lovelas':
-                print("[ADAPT] Девушек больше нет. -> Режим 'Дерзкий'.")
-                state['current_character'] = 'derzkiy'
-                state['listening_mode'] = 'WAKE_WORD'
-                llm_handler.reload_chat_session(prompt.PROMPTS_BY_CHARACTER['derzkiy'])
-                await speak_response_async("Ладно, шоу окончено. Снова в деле.", tts_params)
-
-            if detected_people:
-                unknown_person = next((p for p in detected_people if p['status'] == 'unknown'), None)
-                if unknown_person and state['current_character'] == 'lovelas':
-                    gender = "женщина" if unknown_person.get('gender') == 'Woman' else "мужчина"
-                    internal_prompt = f"[ВНУТРЕННЕЕ СОБЫТИЕ: обнаружен НЕЗНАКОМЕЦ. ПОЛ: {gender}, ВОЗРАСТ: ~{unknown_person.get('age')}, ЭМОЦИЯ: {unknown_person.get('emotion')}]"
-                    action = await llm_handler.get_mrx_action_async(internal_prompt)
-                    await speak_response_async(action.get('response'), tts_params)
-                    state['in_conversation_mode'] = True
-        except queue.Empty:
-            print("[PROACTIVE_TASK] Результат анализа зрения пока не готов.")
-            pass
+# async def proactive_task(state, vision_task_queue, vision_result_queue):
+#     while True:
+#         await asyncio.sleep(PROACTIVE_INTERVAL_SECONDS)
+#         if state['in_conversation_mode']:
+#             continue
+#
+#         print("\n[PROACTIVE_TASK] Запуск фоновой проверки...")
+#         vision_task_queue.put("analyze")
+#         try:
+#             detected_people = vision_result_queue.get_nowait()
+#             print("[PROACTIVE_TASK] Получен результат анализа зрения!")
+#             genders_in_car = {p.get('gender', 'Unknown') for p in detected_people}
+#             current_character = state['current_character']
+#             tts_params = state['tts_params']
+#
+#             if 'Woman' in genders_in_car and current_character != 'lovelas':
+#                 print("[ADAPT] Обнаружена девушка! -> Режим 'Ловелас'.")
+#                 state['current_character'] = 'lovelas'
+#                 state['listening_mode'] = 'CONSTANT'
+#                 llm_handler.reload_chat_session(prompt.PROMPTS_BY_CHARACTER['lovelas'])
+#                 await speak_response_async("Так-так... Кажется, обстановка накаляется. Включаю режим обаяния.",
+#                                            tts_params)
+#
+#             elif 'Woman' not in genders_in_car and current_character == 'lovelas':
+#                 print("[ADAPT] Девушек больше нет. -> Режим 'Дерзкий'.")
+#                 state['current_character'] = 'derzkiy'
+#                 state['listening_mode'] = 'WAKE_WORD'
+#                 llm_handler.reload_chat_session(prompt.PROMPTS_BY_CHARACTER['derzkiy'])
+#                 await speak_response_async("Ладно, шоу окончено. Снова в деле.", tts_params)
+#
+#             if detected_people:
+#                 unknown_person = next((p for p in detected_people if p['status'] == 'unknown'), None)
+#                 if unknown_person and state['current_character'] == 'lovelas':
+#                     gender = "женщина" if unknown_person.get('gender') == 'Woman' else "мужчина"
+#                     internal_prompt = f"[ВНУТРЕННЕЕ СОБЫТИЕ: обнаружен НЕЗНАКОМЕЦ. ПОЛ: {gender}, ВОЗРАСТ: ~{unknown_person.get('age')}, ЭМОЦИЯ: {unknown_person.get('emotion')}]"
+#                     action = await llm_handler.get_mrx_action_async(internal_prompt)
+#                     await speak_response_async(action.get('response'), tts_params)
+#                     state['in_conversation_mode'] = True
+#         except queue.Empty:
+#             print("[PROACTIVE_TASK] Результат анализа зрения пока не готов.")
+#             pass
 
 
 async def main():
     # --- ИНИЦИАЛИЗАЦИЯ СИСТЕМ ---
-    print("Инициализация очередей и процесса для Vision...")
-    vision_task_queue = mp.Queue()
-    vision_result_queue = mp.Queue()
-
-    vision_proc = mp.Process(target=vision_worker.vision_process_worker, args=(vision_task_queue, vision_result_queue))
-    vision_proc.start()
+    # print("Инициализация очередей и процесса для Vision...")
+    # vision_task_queue = mp.Queue()
+    # vision_result_queue = mp.Queue()
+    #
+    # vision_proc = mp.Process(target=vision_worker.vision_process_worker, args=(vision_task_queue, vision_result_queue))
+    # vision_proc.start()
     sfx_player.initialize_sfx()
     language_manager.init_language_system(llm_handler, prompt)
     wake_word_detector.initialize_detector()
@@ -128,7 +126,7 @@ async def main():
     greeting = personality.get_dynamic_greeting(state['current_character'], driver_name)
     await speak_response_async(greeting, state['tts_params'])
 
-    proactive_checker = asyncio.create_task(proactive_task(state, vision_task_queue, vision_result_queue))
+    # proactive_checker = asyncio.create_task(proactive_task(state, vision_task_queue, vision_result_queue))
 
     try:
         # --- ОСНОВНОЙ АСИНХРОННЫЙ ЦИКЛ ---
@@ -228,11 +226,11 @@ async def main():
     finally:
         print("Останавливаю фоновые задачи и процессы...")
         media_player.stop()  # <-- ОСТАНАВЛИВАЕМ МУЗЫКУ ПРИ ВЫХОДЕ
-        proactive_checker.cancel()
-        vision_task_queue.put("shutdown")
-        vision_proc.join(timeout=5)
-        if vision_proc.is_alive():
-            vision_proc.terminate()
+        # proactive_checker.cancel()
+        # vision_task_queue.put("shutdown")
+        # vision_proc.join(timeout=5)
+        # if vision_proc.is_alive():
+        #     vision_proc.terminate()
         arduino_com.close()
         print("MRX отключен.")
 
